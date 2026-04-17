@@ -121,8 +121,12 @@ img { display: block; max-width: 100%; }
   margin: 0 auto;
   padding: 12px 0 8px;
   overflow-x: auto;
+  overflow-y: visible;          /* never clip vertically */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  position: relative;
+  z-index: 1;                   /* below nav (z-index:100) but above body */
+  -webkit-overflow-scrolling: touch;
 }
 .stories::-webkit-scrollbar { display: none; }
 
@@ -131,6 +135,8 @@ img { display: block; max-width: 100%; }
   gap: 14px;
   padding: 0 20px;
   width: max-content;
+  /* ensure track never captures pointer-events away from buttons */
+  pointer-events: none;
 }
 
 .story {
@@ -139,6 +145,13 @@ img { display: block; max-width: 100%; }
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
+  /* restore pointer-events on each story button */
+  pointer-events: auto;
+  /* increase tap target slightly for mobile */
+  padding: 2px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;   /* prevent 300ms delay on iOS */
+  cursor: pointer;
 }
 
 .story__ring {
@@ -733,13 +746,7 @@ img { display: block; max-width: 100%; }
   }
   .desktop-nav-publish:hover { opacity: .85 !important; background: var(--ink) !important; }
 
-  .desktop-nav-footer {
-    padding: 20px 24px;
-    border-top: 1px solid var(--surface-2);
-    font-size: .72rem;
-    color: var(--ink-4);
-    line-height: 1.6;
-  }
+  .desktop-nav-footer-placeholder { /* moved outside media query */ }
 
   /* ── Área de contenido principal ── */
   .site-content {
@@ -842,7 +849,7 @@ img { display: block; max-width: 100%; }
   background: rgba(0,0,0,.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 200;
+  z-index: 500;                 /* above sidebar (100), above bottom-nav (100) */
   display: grid;
   place-items: flex-end center;
   opacity: 0;
@@ -1226,16 +1233,125 @@ img { display: block; max-width: 100%; }
   padding: 10px 20px;
   border-radius: 100px;
   white-space: nowrap;
-  z-index: 300;
+  z-index: 700;                 /* above everything else */
   opacity: 0;
   pointer-events: none;
   transition: opacity .25s, transform .25s var(--ease-out);
-  max-width: calc(var(--max-w) - 40px);
+  max-width: calc(100vw - 40px);
   text-align: center;
 }
 .toast--visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* ── MOBILE FIXES (@media max-width: 768px) ──────── */
+@media (max-width: 768px) {
+
+  /* 1. Feed: ancho completo en móvil */
+  .feed,
+  .feed-label,
+  .stories {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  /* Posts sin bordes laterales en móvil */
+  .post {
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  /* 2. Texto legal del footer de la sidebar:
+        en móvil se muestra inline dentro del top-nav
+        o simplemente se oculta (está solo en desktop) */
+  .desktop-nav-footer {
+    display: none;
+  }
+
+  /* 3. Stories: garantizar z-index correcto y sin bloqueo */
+  .stories {
+    z-index: 1;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .stories__track {
+    /* pointer-events:none en el track para que pasen al botón */
+    pointer-events: none;
+  }
+
+  .story {
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+
+  /* 4. Bottom nav: siempre visible y por encima del contenido */
+  .bottom-nav {
+    z-index: 100;
+    display: flex;
+  }
+
+  /* 5. Top nav: z-index correcto */
+  .top-nav {
+    z-index: 100;
+  }
+
+  /* 6. Modal overlay: cubre toda la pantalla */
+  .modal-overlay {
+    z-index: 500;
+  }
+
+  .modal {
+    max-width: 100%;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  /* 7. Story viewer: pantalla completa en móvil */
+  .story-viewer {
+    z-index: 600;
+    border-radius: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+
+  /* 8. Page sections: padding adecuado */
+  .page-section {
+    padding: 16px 16px 40px;
+  }
+
+  /* 9. Tipografía: ligeramente reducida en móvil */
+  .section-title  { font-size: 1.3rem; }
+  .post__text     { font-size: .92rem; }
+  .editorial-quote { font-size: .9rem; }
+}
+
+/* ── LEGAL TEXT (desktop-nav-footer) — responsive ── */
+.desktop-nav-footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--surface-2);
+  font-size: .72rem;
+  color: var(--ink-4);
+  line-height: 1.6;
+  text-align: left;
+}
+
+/* Versión móvil del texto legal: centrado y pequeño */
+.legal-mobile {
+  display: none;
+  text-align: center;
+  font-size: .65rem;
+  color: var(--ink-4);
+  padding: 12px 20px;
+  line-height: 1.6;
+  border-top: 1px solid var(--surface-2);
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .legal-mobile {
+    display: block;
+  }
 }
 
 /* ── LIVE POST BADGE ─────────────────────────────── */
@@ -1442,7 +1558,7 @@ img { display: block; max-width: 100%; }
 /* ── STORY VIEWER ────────────────────────────────── */
 .story-viewer {
   position: fixed; inset: 0;
-  z-index: 400;
+  z-index: 600;                 /* highest layer — above everything */
   background: #000;
   display: flex;
   flex-direction: column;

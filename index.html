@@ -535,6 +535,12 @@
     </div>
   </section>
 
+  <!-- Texto legal para móvil -->
+  <div class="legal-mobile">
+    Proyecto universitario · Narrativas Convergentes<br>
+    <span style="color:var(--accent)">Ghostface · 2025</span>
+  </div>
+
   </div><!-- /site-content -->
 
   <!-- ░░ BOTTOM NAV ░░ -->
@@ -1266,13 +1272,31 @@
       if (e.key === 'ArrowLeft')  advanceStory(-1);
     });
 
-    // Wire story buttons
+    // Wire story buttons — use both click and touchend for mobile reliability
     document.querySelectorAll('.story[data-story]').forEach(btn => {
+      let touchMoved = false;
+
+      btn.addEventListener('touchstart', () => { touchMoved = false; }, { passive: true });
+      btn.addEventListener('touchmove',  () => { touchMoved = true;  }, { passive: true });
+      btn.addEventListener('touchend', e => {
+        if (!touchMoved) {
+          e.preventDefault(); // prevent ghost click
+          openStory(btn.dataset.story);
+        }
+      });
+      // Click for desktop / non-touch
       btn.addEventListener('click', () => openStory(btn.dataset.story));
     });
 
-    // "Tu voz" story → abre modal
-    document.querySelector('.story--add').addEventListener('click', openModal);
+    // "Tu voz" story → abre modal (touch + click)
+    const storyAddBtn = document.querySelector('.story--add');
+    if (storyAddBtn) {
+      let _tm = false;
+      storyAddBtn.addEventListener('touchstart', () => { _tm = false; }, { passive: true });
+      storyAddBtn.addEventListener('touchmove',  () => { _tm = true;  }, { passive: true });
+      storyAddBtn.addEventListener('touchend', e => { if (!_tm) { e.preventDefault(); openModal(); } });
+      storyAddBtn.addEventListener('click', openModal);
+    }
 
     // Toast container
     function showToast(msg) {
