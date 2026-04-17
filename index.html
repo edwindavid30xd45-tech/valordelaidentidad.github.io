@@ -197,7 +197,7 @@
               <div class="progress-fill" style="width:0%"></div>
             </div>
             <div class="progress-meta">
-              <span>10:42</span><span>28:15</span>
+              <span id="ep4-time-cur">0:00</span><span id="ep4-time-tot">--:--</span>
             </div>
           </div>
           <!-- Audio real oculto -->
@@ -960,6 +960,9 @@
 
     /* ═══════════════════════════════════════════════
        3. REPRODUCTOR DE AUDIO REAL (Ep. 4)
+       Nota: .progress-fill NO tiene transition CSS —
+       los updates de timeupdate (~4Hz) la mueven
+       directamente para evitar el efecto "frozen".
     ═══════════════════════════════════════════════ */
     const audio      = document.getElementById('ep4-audio');
     const btnPlay    = document.getElementById('ep4-play');
@@ -969,12 +972,12 @@
     const iconPause  = document.getElementById('ep4-icon-pause');
     const progressBar= document.querySelector('.progress-bar');
     const fill       = document.querySelector('.progress-fill');
-    const timeCur    = document.querySelector('.progress-meta span:first-child');
-    const timeTot    = document.querySelector('.progress-meta span:last-child');
+    const timeCur    = document.getElementById('ep4-time-cur');
+    const timeTot    = document.getElementById('ep4-time-tot');
     const artIcon    = document.querySelector('.podcast-art__icon');
 
     function fmt(s) {
-      if (!isFinite(s)) return '0:00';
+      if (!isFinite(s) || s < 0) return '0:00';
       const m = Math.floor(s / 60), sec = Math.floor(s % 60);
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
@@ -988,8 +991,6 @@
       iconPlay.style.display  = 'none';
       iconPause.style.display = '';
       artIcon.style.background = 'rgba(255,255,255,.22)';
-      artIcon.style.transform  = 'scale(1.08)';
-      // Activar animación de giro/pulso del disco
       artIcon.classList.add('podcast-art__icon--spinning');
     });
 
@@ -997,47 +998,54 @@
       iconPlay.style.display  = '';
       iconPause.style.display = 'none';
       artIcon.style.background = 'rgba(255,255,255,.12)';
-      artIcon.style.transform  = 'scale(1)';
       artIcon.classList.remove('podcast-art__icon--spinning');
     });
 
-    // Progreso en tiempo real
+    // ── CLAVE: timeupdate actualiza fill.style.width directamente ──
+    // No hay transition en CSS para que esto se vea en tiempo real.
     audio.addEventListener('timeupdate', () => {
-      if (!audio.duration) return;
+      if (!audio.duration || !isFinite(audio.duration)) return;
       const pct = (audio.currentTime / audio.duration) * 100;
-      fill.style.width = pct + '%';
+      fill.style.width = pct.toFixed(2) + '%';   // 2 decimales = movimiento suave
       timeCur.textContent = fmt(audio.currentTime);
     });
 
     audio.addEventListener('loadedmetadata', () => {
-      timeTot.textContent = fmt(audio.duration);
-      // resetear barra al valor real (antes tenía valor estático)
-      fill.style.width = '0%';
+      fill.style.width  = '0%';
       timeCur.textContent = '0:00';
+      timeTot.textContent = fmt(audio.duration);
     });
 
     audio.addEventListener('ended', () => {
-      fill.style.width = '100%';
+      fill.style.width    = '100%';
+      iconPlay.style.display  = '';
+      iconPause.style.display = 'none';
+      artIcon.classList.remove('podcast-art__icon--spinning');
     });
 
-    // Clic en barra de progreso (seek)
+    // Seek: clic en barra
     progressBar.addEventListener('click', function (e) {
       if (!audio.duration) return;
       const rect = this.getBoundingClientRect();
-      audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+      const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      audio.currentTime = pct * audio.duration;
+      fill.style.width = (pct * 100).toFixed(2) + '%';
     });
 
-    // Arrastre en barra (touch-friendly)
+    // Seek: arrastre táctil
     let dragging = false;
-    progressBar.addEventListener('pointerdown', () => { dragging = true; });
-    document.addEventListener('pointermove', e => {
+    progressBar.addEventListener('pointerdown', e => {
+      dragging = true;
+      progressBar.setPointerCapture(e.pointerId);
+    });
+    progressBar.addEventListener('pointermove', e => {
       if (!dragging || !audio.duration) return;
       const rect = progressBar.getBoundingClientRect();
       const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      fill.style.width = (pct * 100) + '%';
+      fill.style.width = (pct * 100).toFixed(2) + '%';
       timeCur.textContent = fmt(pct * audio.duration);
     });
-    document.addEventListener('pointerup', e => {
+    progressBar.addEventListener('pointerup', e => {
       if (!dragging || !audio.duration) return;
       const rect = progressBar.getBoundingClientRect();
       const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
@@ -1272,20 +1280,37 @@
       if (e.key === 'ArrowLeft')  advanceStory(-1);
     });
 
-    // Wire story buttons — use both click and touchend for mobile reliability
+    // Wire story buttons — triple strategy for maximum mobile reliability:
+    // 1. touchend (primary for mobile, prevents 300ms delay)
+    // 2. click with capture phase (catches events that bubbled up)
+    // 3. pointerup fallback
     document.querySelectorAll('.story[data-story]').forEach(btn => {
-      let touchMoved = false;
+      let touchStartX = 0, touchStartY = 0, touchMoved = false;
 
-      btn.addEventListener('touchstart', () => { touchMoved = false; }, { passive: true });
-      btn.addEventListener('touchmove',  () => { touchMoved = true;  }, { passive: true });
+      btn.addEventListener('touchstart', e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchMoved  = false;
+      }, { passive: true });
+
+      btn.addEventListener('touchmove', e => {
+        const dx = Math.abs(e.touches[0].clientX - touchStartX);
+        const dy = Math.abs(e.touches[0].clientY - touchStartY);
+        // Only flag as "moved" if actually scrolling (dx > 8 = horizontal scroll)
+        if (dx > 8 || dy > 8) touchMoved = true;
+      }, { passive: true });
+
       btn.addEventListener('touchend', e => {
-        if (!touchMoved) {
-          e.preventDefault(); // prevent ghost click
-          openStory(btn.dataset.story);
-        }
+        if (touchMoved) return;          // was a scroll, not a tap
+        e.preventDefault();             // cancel ghost click
+        openStory(btn.dataset.story);
+      }, { passive: false });
+
+      // Desktop fallback
+      btn.addEventListener('click', e => {
+        // Only fires on non-touch or if touchend didn't preventDefault
+        openStory(btn.dataset.story);
       });
-      // Click for desktop / non-touch
-      btn.addEventListener('click', () => openStory(btn.dataset.story));
     });
 
     // "Tu voz" story → abre modal (touch + click)
