@@ -1748,12 +1748,14 @@ img { display: block; max-width: 100%; }
 
 /* Desktop: story viewer max-width centrado */
 @media (min-width: 900px) {
-  .story-viewer {
-    max-width: 420px;
-    left: 50%; right: auto;
+ .story-viewer {
+    width: min(420px, calc(100vw - 40px));  /* ancho real, nunca colapsa */
+    left: 50%;
+    right: auto;
     transform: translateX(-50%);
     border-radius: var(--radius-xl);
-    top: 20px; bottom: 20px;
+    top: 20px;
+    bottom: 20px;
     height: auto;
   }
   .sv-footer { padding-bottom: 32px; }
