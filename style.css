@@ -1773,13 +1773,13 @@ img { display: block; max-width: 100%; }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink:         #f0f0f0;
-    --ink-2:       #c8c8c8;
+    --ink: #ffffff;         /* El texto principal pasa a blanco */
+    --ink-2: #e0e0e0;       /* Texto secundario a gris claro */
     --ink-3:       #888;
     --ink-4:       #555;
-    --surface:     #0e0e0e;
-    --surface-2:   #1a1a1a;
-    --surface-3:   #282828;
+    --surface: #0d0d0d;     /* Fondo principal oscuro */
+    --surface-2: #1a1a1a;   /* Fondos de tarjetas oscuros */
+    --surface-3: #2a2a2a;   /* Bordes o líneas oscuras */
     --white:       #161616;
     --accent-soft: rgba(100,100,255,.12);
     --accent-mid:  rgba(100,100,255,.22);
