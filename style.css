@@ -446,7 +446,7 @@ img { display: block; max-width: 100%; }
   left: 0;
   height: 100%;
   width: 0%; 
-  background: #000000; /* Negra como pediste */
+  background: var(--ink); /* MAGIA: Negro de día, Blanco de noche automático */
   border-radius: 2px;
   transition: width 0.1s linear;
 }
