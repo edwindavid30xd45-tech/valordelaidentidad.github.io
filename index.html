@@ -961,103 +961,79 @@
 
     /* ═══════════════════════════════════════════════
        3. REPRODUCTOR DE AUDIO REAL (Ep. 4)
-       Nota: .progress-fill NO tiene transition CSS —
-       los updates de timeupdate (~4Hz) la mueven
-       directamente para evitar el efecto "frozen".
-    ═══════════════════════════════════════════════ */
-    const audio      = document.getElementById('ep4-audio');
-    const btnPlay    = document.getElementById('ep4-play');
-    const btnBack    = document.getElementById('ep4-back');
-    const btnFwd     = document.getElementById('ep4-fwd');
-    const iconPlay   = document.getElementById('ep4-icon-play');
-    const iconPause  = document.getElementById('ep4-icon-pause');
-    const progressBar= document.querySelector('.progress-bar');
-    const fill       = document.querySelector('.progress-fill');
-    const timeCur    = document.getElementById('ep4-time-cur');
-    const timeTot    = document.getElementById('ep4-time-tot');
-    const artIcon    = document.querySelector('.podcast-art__icon');
+      // 1. Capturamos todos los elementos primero
+    const audio     = document.getElementById('ep4-audio');
+    const btnPlay   = document.getElementById('ep4-play');
+    const btnBack   = document.getElementById('ep4-back');
+    const btnFwd    = document.getElementById('ep4-fwd');
+    const iconPlay  = document.getElementById('ep4-icon-play');
+    const iconPause = document.getElementById('ep4-icon-pause');
+    const artIcon   = document.querySelector('.podcast-art__icon');
 
+    // 2. Función para formatear el tiempo
     function fmt(s) {
       if (!isFinite(s) || s < 0) return '0:00';
-      const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
-    // Play / Pause
-    btnPlay.addEventListener('click', () => {
-      audio.paused ? audio.play().catch(() => {}) : audio.pause();
-    });
+    // 3. Lógica principal
+    if (audio && btnPlay) {
+      
+      // Click en Play/Pause
+      btnPlay.onclick = () => {
+        audio.paused ? audio.play().catch(e => console.log("Error play:", e)) : audio.pause();
+      };
 
-    audio.addEventListener('play', () => {
-      iconPlay.style.display  = 'none';
-      iconPause.style.display = '';
-      artIcon.style.background = 'rgba(255,255,255,.22)';
-      artIcon.classList.add('podcast-art__icon--spinning');
-    });
+      // Eventos visuales (Iconos y animación)
+      audio.onplay = () => {
+        if (iconPlay) iconPlay.style.display = 'none';
+        if (iconPause) iconPause.style.display = '';
+        if (artIcon) artIcon.classList.add('podcast-art__icon--spinning');
+      };
 
-    audio.addEventListener('pause', () => {
-      iconPlay.style.display  = '';
-      iconPause.style.display = 'none';
-      artIcon.style.background = 'rgba(255,255,255,.12)';
-      artIcon.classList.remove('podcast-art__icon--spinning');
-    });
+      audio.onpause = () => {
+        if (iconPlay) iconPlay.style.display = '';
+        if (iconPause) iconPause.style.display = 'none';
+        if (artIcon) artIcon.classList.remove('podcast-art__icon--spinning');
+      };
 
-    // ── CLAVE: timeupdate actualiza fill.style.width directamente ──
-    // No hay transition en CSS para que esto se vea en tiempo real.
-    audio.addEventListener('timeupdate', () => {
-      if (!audio.duration || !isFinite(audio.duration)) return;
-      const pct = (audio.currentTime / audio.duration) * 100;
-      fill.style.width = pct.toFixed(2) + '%';   // 2 decimales = movimiento suave
-      timeCur.textContent = fmt(audio.currentTime);
-    });
+      // LA ANIMACIÓN (BARRA Y TIEMPO)
+      audio.ontimeupdate = () => {
+        if (!audio.duration) return;
+        
+        // Mover barra
+        const pct = (audio.currentTime / audio.duration) * 100;
+        const barrita = document.querySelector('.progress-fill');
+        if (barrita) barrita.style.width = pct.toFixed(2) + '%';
+        
+        // Cambiar número de tiempo actual
+        const txtCur = document.getElementById('ep4-time-cur');
+        if (txtCur) txtCur.textContent = fmt(audio.currentTime);
+      };
 
-    audio.addEventListener('loadedmetadata', () => {
-      fill.style.width  = '0%';
-      timeCur.textContent = '0:00';
-      timeTot.textContent = fmt(audio.duration);
-    });
+      // Cargar duración total
+      audio.onloadedmetadata = () => {
+        const txtTot = document.getElementById('ep4-time-tot');
+        if (txtTot) txtTot.textContent = fmt(audio.duration);
+      };
 
-    audio.addEventListener('ended', () => {
-      fill.style.width    = '100%';
-      iconPlay.style.display  = '';
-      iconPause.style.display = 'none';
-      artIcon.classList.remove('podcast-art__icon--spinning');
-    });
+      // Botones atrás/adelante
+      if (btnBack) btnBack.onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 15);
+      if (btnFwd)  btnFwd.onclick  = () => audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 15);
 
-    // Seek: clic en barra
-    progressBar.addEventListener('click', function (e) {
-      if (!audio.duration) return;
-      const rect = this.getBoundingClientRect();
-      const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      audio.currentTime = pct * audio.duration;
-      fill.style.width = (pct * 100).toFixed(2) + '%';
-    });
-
-    // Seek: arrastre táctil
-    let dragging = false;
-    progressBar.addEventListener('pointerdown', e => {
-      dragging = true;
-      progressBar.setPointerCapture(e.pointerId);
-    });
-    progressBar.addEventListener('pointermove', e => {
-      if (!dragging || !audio.duration) return;
-      const rect = progressBar.getBoundingClientRect();
-      const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      fill.style.width = (pct * 100).toFixed(2) + '%';
-      timeCur.textContent = fmt(pct * audio.duration);
-    });
-    progressBar.addEventListener('pointerup', e => {
-      if (!dragging || !audio.duration) return;
-      const rect = progressBar.getBoundingClientRect();
-      const pct  = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      audio.currentTime = pct * audio.duration;
-      dragging = false;
-    });
-
-    btnBack.addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
-    btnFwd.addEventListener('click',  () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 15); });
-
-
+      // Clic en la barra para saltar (Seek)
+      const barraPadre = document.querySelector('.progress-bar');
+      if (barraPadre) {
+        barraPadre.onclick = (e) => {
+          if (!audio.duration) return;
+          const rect = barraPadre.getBoundingClientRect();
+          const pct = (e.clientX - rect.left) / rect.width;
+          audio.currentTime = pct * audio.duration;
+        };
+      }
+    }
     /* ═══════════════════════════════════════════════
        4. BOTÓN RESONAR — posts existentes
     ═══════════════════════════════════════════════ */
